@@ -7,7 +7,7 @@ public class MyBot : IChessBot
     class RatedMove
     {
         public Move move { get; set; }
-        public int Rating { get; set; }
+        public float Rating { get; set; }
     }
 
     private List<RatedMove> ratedMoves {get; set; }
@@ -22,22 +22,18 @@ public class MyBot : IChessBot
         }
 
         RatedMove x =  ratedMoves.MaxBy(x => x.Rating);
-        Console.WriteLine("Move: " + x.move +"rating: " + x.Rating);
+        Console.WriteLine(x.move +"rating: " + x.Rating);
         return x.move;
     }
 
     private RatedMove RateMove(Move move,Board board)
     {
-        int rating = 0;
-        if (IsSafeCapture(move,board))
-        {
-            rating++;
-        }
-        if(IsProtected(move,board))
-        {
-            rating++;
-        }
-        
+        float rating = 0;
+
+        rating += IsUnderAttack(move,board);
+        rating += IsCapture(move,board);
+        rating += IsProtectedMove(move,board);
+        rating += IsProtected(move, board);
         return new RatedMove()
         {
             move = move,
@@ -45,16 +41,43 @@ public class MyBot : IChessBot
         };
     }
 
-    private bool IsProtected(Move move, Board board)
+    private float IsCheck(Move move, Board board)
+    {
+        var kingSquare = board.GetKingSquare(!board.IsWhiteToMove);
+        board.MakeMove(move);
+        bool isCheck = board.SquareIsAttackedByOpponent(kingSquare);
+        board.UndoMove(move);
+        return isCheck ? 2 : 0;
+    }
+    private float IsUnderAttack(Move move, Board board)
+    {
+        var isAttacked = board.SquareIsAttackedByOpponent(move.StartSquare);
+        return isAttacked ? 1 : 0;
+    }
+
+    private float IsProtected(Move move, Board board)
+    {
+        bool isProtected = false;
+        bool skipped = board.TrySkipTurn();
+        if (skipped)
+        {
+            isProtected = board.SquareIsAttackedByOpponent(move.StartSquare);
+            board.UndoSkipTurn();
+        }
+
+        return isProtected ? -0.5f : 0;
+    }
+    private float IsProtectedMove(Move move, Board board)
     {
         board.MakeMove(move);
         var isAttacked = board.SquareIsAttackedByOpponent(move.TargetSquare);
         board.UndoMove(move);
-        return isAttacked;
+        return isAttacked ? 1 : 0;
     }
 
-    private bool IsSafeCapture(Move move, Board board)
+    private float IsCapture(Move move, Board board)
     {
-        return move.IsCapture && !board.SquareIsAttackedByOpponent(move.TargetSquare);
+        var isCapture = !board.SquareIsAttackedByOpponent(move.TargetSquare);
+        return isCapture ? 1 : 0;
     }
 }
